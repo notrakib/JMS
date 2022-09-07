@@ -72,6 +72,13 @@ class CompanySerializer(serializers.ModelSerializer):
                   'logo', 'description', 'type', 'status']
 
 
+class OnlyCompanySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Company
+        fields = '__all__'
+
+
 class JobSerializer(serializers.ModelSerializer):
     recruiter = RecruiterSerializer(read_only=True)
     company = CompanySerializer(read_only=True)
@@ -80,6 +87,13 @@ class JobSerializer(serializers.ModelSerializer):
         model = Job
         fields = ['id', 'recruiter', 'company', 'title',
                   'description', 'experience', 'skills', 'location', 'salary', 'start_date', 'end_date', 'status']
+
+
+class OnlyJobSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Job
+        fields = '__all__'
 
 
 class ApplySerializer(serializers.ModelSerializer):

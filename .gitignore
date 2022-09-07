@@ -1,3 +1,7 @@
 .ipynb_checkpoints
 
 Untitled-1.ipynb
+
+__pycache__
+
+middleware/__pycache__

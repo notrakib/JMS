@@ -6,238 +6,309 @@ from .serializers import *
 from .models import *
 from datetime import date
 import random
+from django.utils.decorators import decorator_from_middleware
+from app.middleware.middleware_session import session_middleware
+
+from functools import wraps
+import json
+from django.http import HttpResponseForbidden
+import jwt
 
 
-@api_view(['GET', 'POST', 'DELETE'])
-def ErrorPage(request):
-    if request.method == 'POST' or 'GET' or 'DELETE':
-        return Response({'not_found': 'Page Not Found'}, status=status.HTTP_400_BAD_REQUEST)
+def custom_view_decorator(view_function):
+    @wraps(view_function)
+    def wrap(request, *args, **kwargs):
+        try:
+            token = request.META.get('HTTP_AUTHORIZATION').split()
+            user = jwt.decode(token[1], key='my_super_secret',
+                              algorithms=['HS256', ])
+
+            request.curr_user = user
+            return view_function(request, *args, **kwargs)
+
+        except Exception as e:
+            return view_function(request, *args, **kwargs)
+
+    return wrap
 
 
 @api_view(['POST'])
 def AdminSignUp(request):
 
-    if request.method == 'POST':
-        name = request.data.get('name')
-        email = request.data.get('email')
-        password = request.data.get('password')
-        image = request.FILES.get('image')
-        mobile = request.data.get('mobile')
-        gender = request.data.get('gender')
+    name = request.data.get('name')
+    email = request.data.get('email')
+    password = request.data.get('password')
+    image = request.FILES.get('image')
+    mobile = request.data.get('mobile')
+    gender = request.data.get('gender')
 
-        type = request.data.get('type')
-        try:
-            user = User.objects.create(
-                name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+    type = request.data.get('type')
+    try:
+        user = User.objects.create(
+            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
 
-            admin = Admin.objects.create(
-                user=user,  type=type)
+        admin = Admin.objects.create(
+            user=user,  type=type)
 
-            serializer = AdminSerializer(admin)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = AdminSerializer(admin)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def StudentSignUp(request):
 
-    if request.method == 'POST':
-        name = request.data.get('name')
-        email = request.data.get('email')
-        password = request.data.get('password')
-        image = request.FILES.get('image')
-        mobile = request.data.get('mobile')
-        gender = request.data.get('gender')
+    name = request.data.get('name')
+    email = request.data.get('email')
+    password = request.data.get('password')
+    image = request.FILES.get('image')
+    mobile = request.data.get('mobile')
+    gender = request.data.get('gender')
 
-        # resume = request.FILES.get('resume')
-        try:
-            user = User.objects.create(
-                name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+    # resume = request.FILES.get('resume')
+    try:
+        user = User.objects.create(
+            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
 
-            student = Student.objects.create(
-                user=user)
+        student = Student.objects.create(
+            user=user)
 
-            serializer = StudentSerializer(student)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        serializer = StudentSerializer(student)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def RecruiterSignUp(request):
 
-    if request.method == 'POST':
-        name = request.data.get('name')
-        email = request.data.get('email')
-        password = request.data.get('password')
-        image = request.FILES.get('image')
-        mobile = request.data.get('mobile')
-        gender = request.data.get('gender')
+    name = request.data.get('name')
+    email = request.data.get('email')
+    password = request.data.get('password')
+    image = request.FILES.get('image')
+    mobile = request.data.get('mobile')
+    gender = request.data.get('gender')
 
-        try:
-            user = User.objects.create(
-                name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+    try:
+        user = User.objects.create(
+            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
 
-            recruiter = Recruiter.objects.create(
-                user=user)
+        recruiter = Recruiter.objects.create(
+            user=user)
 
-            serializer = RecruiterSerializer(recruiter)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        serializer = RecruiterSerializer(recruiter)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @api_view(['POST'])
 def CreateCompany(request, pk):
 
-    if request.method == 'POST':
-        email = request.data.get('email')
-        name = request.data.get('name')
-        # logo = request.FILES.get('logo')
-        description = request.data.get('description')
-        type = request.data.get('type')
+    if request.curr_user.get('type') == 'recruiter':
 
-        recruiter = request.objects.get(pk=pk)
-        try:
-            company = Company.objects.create(recruiter=recruiter,
-                                             email=email, name=name,  description=description, type=type)
+        if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
 
-            serializer = CompanySerializer(company)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            email = request.data.get('email')
+            name = request.data.get('name')
+            # logo = request.FILES.get('logo')
+            description = request.data.get('description')
+            type = request.data.get('type')
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            recruiter = request.objects.get(pk=pk)
+            try:
+                company = Company.objects.create(recruiter=recruiter,
+                                                 email=email, name=name,  description=description, type=type)
+
+                serializer = CompanySerializer(company)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'error': 'Recruiter needs to be accepted'}, status=status.HTTP_403_FORBIDDEN)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
 
 @api_view(['POST'])
 def AdminSignIn(request):
 
-    if request.method == 'POST':
-        email = request.data.get('email')
-        password = request.data.get('password')
+    email = request.data.get('email')
+    password = request.data.get('password')
 
-        try:
-            admin = Admin.objects.filter(user__email=email)
+    try:
+        admin = Admin.objects.filter(user__email=email)
 
-            if admin:
+        if admin:
 
-                if admin[0].user.password == password:
-                    serializer = AdminSerializer(admin, many=True)
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-                else:
-                    raise Exception('Invalid Password')
+            if admin[0].user.password == password:
 
+                payload_data = {
+                    "id": admin[0].id,
+                    "email": admin[0].user.email,
+                    "type": admin[0].type
+                }
+                token = jwt.encode(
+                    payload=payload_data,
+                    key='ami_rakib'
+                )
+
+                return Response({'token': token, 'payload_data': payload_data}, status=status.HTTP_200_OK)
             else:
-                raise Exception('Invalid Email')
+                raise Exception('Invalid Password')
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            raise Exception('Invalid Email')
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def StudentSignIn(request):
 
-    if request.method == 'POST':
-        email = request.data.get('email')
-        password = request.data.get('password')
+    email = request.data.get('email')
+    password = request.data.get('password')
 
-        try:
-            student = Student.objects.filter(user__email=email)
+    try:
+        student = Student.objects.filter(user__email=email)
 
-            if student.exists():
+        if student.exists():
 
-                if student[0].user.password == password:
-                    serializer = StudentSerializer(student, many=True)
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-                else:
-                    raise Exception('Invalid Password')
+            if student[0].user.password == password:
 
+                payload_data = {
+                    "id": student[0].id,
+                    "email": student[0].user.email,
+                    "type": student[0].type
+                }
+                token = jwt.encode(
+                    payload=payload_data,
+                    key='ami_rakib'
+                )
+
+                return Response({'token': token, 'payload_data': payload_data}, status=status.HTTP_200_OK)
             else:
-                raise Exception('Invalid Email')
+                raise Exception('Invalid Password')
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            raise Exception('Invalid Email')
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
 def RecruiterSignIn(request):
 
-    if request.method == 'POST':
-        email = request.data.get('email')
-        password = request.data.get('password')
+    email = request.data.get('email')
+    password = request.data.get('password')
 
-        try:
-            recruiter = Recruiter.objects.filter(user__email=email)
+    try:
+        recruiter = Recruiter.objects.filter(user__email=email)
 
-            if recruiter:
+        if recruiter:
 
-                if recruiter[0].user.password == password:
-                    serializer = RecruiterSerializer(recruiter, many=True)
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-                else:
-                    raise Exception('Invalid Password')
+            if recruiter[0].user.password == password:
 
+                payload_data = {
+                    "id": recruiter[0].id,
+                    "email": recruiter[0].user.email,
+                    "type": recruiter[0].type
+                }
+                token = jwt.encode(
+                    payload=payload_data,
+                    key='ami_rakib'
+                )
+
+                return Response({'token': token, 'payload_data': payload_data}, status=status.HTTP_200_OK)
             else:
-                raise Exception('Invalid Email')
+                raise Exception('Invalid Password')
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            raise Exception('Invalid Email')
 
-
-# @api_view(['GET'])
-# def SignOut(request):
-#     logout(request)
-#     return Response(status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @api_view(['GET'])
 def ViewAdmins(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
-            admnis = Admin.objects.exclude(status='manager')
-            serializer = AdminSerializer(admnis, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
+                admnis = Admin.objects.exclude(status='manager')
+                serializer = AdminSerializer(admnis, many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Only Manager can take action'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def ViewUsers(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
-            users = User.objects.all()
-            serializer = UserSerializer(users, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
+                users = User.objects.all()
+                serializer = UserSerializer(users, many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Only Manager can take action'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def ViewStudents(request):
-    print(request.error)
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
+
         try:
-            students = User.objects.select_related('student').all()
-            serializer = UserStudentSerializer(students, many=True)
-            return Response(serializer.data,  status=status.HTTP_200_OK)
+            if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
+                students = User.objects.select_related('student').all()
+                serializer = UserStudentSerializer(students, many=True)
+                return Response(serializer.data,  status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Only Manager can take action'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def ViewRecruiters(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
             students = User.objects.select_related('recruiter').all()
             serializer = UserRecruiterSerializer(students, many=True)
@@ -246,36 +317,47 @@ def ViewRecruiters(request):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
+
 
 @api_view(['GET'])
 def ViewCompanies(request):
 
-    if request.method == 'GET':
-        try:
-            company = Company.objects.all()
-            serializer = RecruiterSerializer(company, many=True)
-            return Response(serializer.data,  status=status.HTTP_200_OK)
+    try:
+        company = Company.objects.all()
+        serializer = OnlyCompanySerializer(company, many=True)
+        return Response(serializer.data,  status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @api_view(['DELETE'])
 def DeleteUser(request, pk):
 
-    if request.method == 'DELETE':
+    if request.curr_user.get('type') == 'admin':
         try:
-            User.objects.get(pk=pk).delete()
-            return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
+            if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
+                User.objects.get(pk=pk).delete()
+                return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
+
+            else:
+                return Response({'error': 'Only Manager can take action'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['DELETE'])
 def DeleteStudent(request, pk):
 
-    if request.method == 'DELETE':
+    if request.curr_user.get('type') == 'admin':
         try:
             Student.objects.get(pk=pk).delete()
             return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
@@ -283,11 +365,15 @@ def DeleteStudent(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['DELETE'])
 def DeleteRecruiter(request, pk):
 
-    if request.method == 'DELETE':
+    if request.curr_user.get('type') == 'admin':
         try:
             Recruiter.objects.get(pk=pk).delete()
             return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
@@ -295,11 +381,15 @@ def DeleteRecruiter(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['DELETE'])
 def DeleteCompany(request, pk):
 
-    if request.method == 'DELETE':
+    if request.curr_user.get('type') == 'admin':
         try:
             Company.objects.get(pk=pk).delete()
             return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
@@ -307,11 +397,15 @@ def DeleteCompany(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['DELETE'])
 def DeleteJob(request, pk):
 
-    if request.method == 'DELETE':
+    if request.curr_user.get('type') == 'recruiter':
         try:
             Job.objects.get(pk=pk).delete()
             return Response({'Deletion': 'Successfull'}, status=status.HTTP_202_ACCEPTED)
@@ -319,11 +413,15 @@ def DeleteJob(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def RecruiterPending(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
             recruiters = Recruiter.objects.filter(status="pending")
             serializer = RecruiterSerializer(recruiters, many=True)
@@ -332,11 +430,15 @@ def RecruiterPending(request):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def RecruiterAccept(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
             recruiters = Recruiter.objects.filter(status="accepted")
             serializer = RecruiterSerializer(recruiters, many=True)
@@ -345,11 +447,15 @@ def RecruiterAccept(request):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['GET'])
 def RecruiterReject(request):
 
-    if request.method == 'GET':
+    if request.curr_user.get('type') == 'admin':
         try:
             recruiters = Recruiter.objects.filter(status="rejected")
             serializer = RecruiterSerializer(recruiters, many=True)
@@ -358,28 +464,42 @@ def RecruiterReject(request):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['POST'])
 def ChangeStatusAdmin(request, pk):
 
-    if request.method == "POST":
-        status = request.data.get('status')
-        try:
-            admin = Admin.objects.get(pk=pk)
-            admin.status = status
-            res = admin.save()
+    if request.curr_user.get('type') == 'admin':
 
-            serializer = AdminSerializer(res)
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        try:
+            status = request.data.get('status')
+
+            if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
+                admin = Admin.objects.get(pk=pk)
+                admin.status = status
+                res = admin.save()
+
+                serializer = AdminSerializer(res)
+                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+            else:
+                return Response({'error': 'Only Manager can take action'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @api_view(['POST'])
 def ChangeStatusRecruiter(request, pk):
 
-    if request.method == "POST":
+    if request.curr_user.get('type') == 'admin':
         status = request.data.get('status')
         try:
             recruiter = Recruiter.objects.get(pk=pk)
@@ -392,14 +512,17 @@ def ChangeStatusRecruiter(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @ api_view(['POST'])
 def ChangeStatusJob(request, pk):
 
-    if request.method == 'POST':
+    if request.curr_user.get('type') == 'recruiter':
 
         status = request.data.get('status')
-
         try:
             job = Job.objects.get(pk=pk).update(
                 end_date=date.today(), status=status)
@@ -409,21 +532,24 @@ def ChangeStatusJob(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
+
 
 @api_view(['POST'])
 def ForgotPassword(request):
 
     email = request.data.get('email')
-    if request.method == "POST":
-        try:
-            user = User.objects.get(email=email)
-            link = random.randint(0, 100000)
-            serializer = UserSerializer(user)
 
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+    try:
+        user = User.objects.get(email=email)
+        link = random.randint(0, 100000)
+        serializer = UserSerializer(user)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -443,148 +569,195 @@ def ChangePassword(request, link):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @api_view(['POST'])
 def CreateJob(request):
 
-    if request.method == 'POST':
-        recruiter = request.data.get('recruiter')
-        company = request.data.get('company')
-        title = request.data.get('title')
-        description = request.data.get('description')
-        experience = request.data.get('experience')
-        skills = request.data.get('skills')
-        location = request.data.get('location')
-        salary = request.data.get('salary')
-        end_date = request.data.get('end_date')
-        status = request.data.get('status')
+    if request.curr_user.get('type') == 'recruiter':
 
-        try:
-            job = Job.objects.create(recruiter=recruiter, company=company, title=title, description=description, experience=experience, skills=skills,
-                                     location=location,  salary=salary,  start_date=date.today(), end_date=end_date, status=status)
-            serializer = JobSerializer(job)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            recruiter = request.data.get('recruiter')
+            company = request.data.get('company')
+            title = request.data.get('title')
+            description = request.data.get('description')
+            experience = request.data.get('experience')
+            skills = request.data.get('skills')
+            location = request.data.get('location')
+            salary = request.data.get('salary')
+            end_date = request.data.get('end_date')
+            status = request.data.get('status')
+
+            try:
+                job = Job.objects.create(recruiter=recruiter, company=company, title=title, description=description, experience=experience, skills=skills,
+                                         location=location,  salary=salary,  start_date=date.today(), end_date=end_date, status=status)
+                serializer = JobSerializer(job)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'error': 'Recruiter needs to be accepted'}, status=status.HTTP_403_FORBIDDEN)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
 
 @api_view(['GET'])
 def ViewJobs(request):
 
-    if request.method == "GET":
-        try:
-            job = Job.objects.all()
-            serializer = JobSerializer(job, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+    try:
+        job = Job.objects.all()
+        serializer = JobSerializer(job, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @api_view(['POST'])
 def EditCompany(request, pk):
 
-    if request.method == 'POST':
-        email = request.data.get('email')
-        name = request.data.get('name')
-        # logo = request.FILES.get('logo')
-        description = request.data.get('description')
-        type = request.data.get('type')
+    if request.curr_user.get('type') == 'recruiter':
 
-        try:
-            company = Company.objects.get(pk=pk).update(
-                email=email, name=name,  description=description, type=type)
+        if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
 
-            serializer = CompanySerializer(company)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            email = request.data.get('email')
+            name = request.data.get('name')
+            # logo = request.FILES.get('logo')
+            description = request.data.get('description')
+            type = request.data.get('type')
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                company = Company.objects.get(pk=pk).update(
+                    email=email, name=name,  description=description, type=type)
+
+                serializer = CompanySerializer(company)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'error': 'Recruiter needs to be accepted'}, status=status.HTTP_403_FORBIDDEN)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
 
+@custom_view_decorator
 @ api_view(['POST'])
 def EditJob(request, pk):
 
-    if request.method == 'POST':
-        title = request.data.get('title')
-        description = request.data.get('description')
-        experience = request.data.get('experience')
-        skills = request.data.get('skills')
-        location = request.data.get('location')
-        salary = request.data.get('salary')
-        end_date = request.data.get('end_date')
-        status = request.data.get('status')
+    if request.curr_user.get('type') == 'recruiter':
 
-        try:
-            job = Job.objects.get(pk=pk).update(title=title, description=description, experience=experience, skills=skills,
-                                                location=location,  salary=salary, end_date=end_date, status=status)
-            serializer = JobSerializer(job)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            title = request.data.get('title')
+            description = request.data.get('description')
+            experience = request.data.get('experience')
+            skills = request.data.get('skills')
+            location = request.data.get('location')
+            salary = request.data.get('salary')
+            end_date = request.data.get('end_date')
+            status = request.data.get('status')
+
+            try:
+                job = Job.objects.get(pk=pk).update(title=title, description=description, experience=experience, skills=skills,
+                                                    location=location,  salary=salary, end_date=end_date, status=status)
+                serializer = JobSerializer(job)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'error': 'Recruiter needs to be accepted'}, status=status.HTTP_403_FORBIDDEN)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
 
+@custom_view_decorator
 @ api_view(['GET'])
 def AvailableJobs(request):
 
-    if request.method == "GET":
+    if request.curr_user.get('type') == 'student':
         try:
-            job = Job.objects.select_related(
-                'apply').filter(apply__student=None)
+            job = Job.objects.exclude(
+                apply__student=Student.objects.get(pk=request.curr_user.get('id')))
 
-            serializer = JobSerializer(job, many=True)
+            serializer = OnlyJobSerializer(job, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @ api_view(['GET'])
 def StudentJobList(request):
 
-    if request.method == "GET":
+    if request.curr_user.get('type') == 'student':
         try:
-            student = Student.objects.get(pk=1)
-            applied = Apply.objects.filter(student=student)
-            serializer = ApplySerializer(applied, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@ api_view(['GET'])
-def RecruiterJobList(request):
-
-    if request.method == "GET":
-        try:
-            recruiter = Recruiter.objects.get(pk=1)
-            job = Job.objects.filter(recruiter=recruiter)
+            student = Student.objects.get(pk=request.curr_user.get('id'))
+            job = Job.objects.select_related(
+                'apply').filter(apply__student=student)
             serializer = JobSerializer(job, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
+
+
+@custom_view_decorator
+@ api_view(['GET'])
+def RecruiterJobList(request):
+
+    if request.curr_user.get('type') == 'recruiter':
+        try:
+            if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
+                recruiter = Recruiter.objects.get(
+                    pk=request.curr_user.get('id'))
+                job = Job.objects.filter(recruiter=recruiter)
+                serializer = OnlyJobSerializer(job, many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Recruiter needs to be accepted'}, status=status.HTTP_403_FORBIDDEN)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
 
 @ api_view(['GET'])
 def JobDetail(request, pk):
 
-    if request.method == "GET":
-        try:
-            job = Job.objects.get(pk=pk)
-            serializer = JobSerializer(job)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+    try:
+        job = Job.objects.get(pk=pk)
+        serializer = JobSerializer(job)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@custom_view_decorator
 @ api_view(['POST'])
 def ApplyForJob(request, pk):
 
-    if request.method == "POST":
+    if request.curr_user.get('type') == 'student':
         try:
             job = Job.objects.get(pk=pk)
             student = Student.objects.get(pk=1)
@@ -600,11 +773,15 @@ def ApplyForJob(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @ api_view(['GET'])
 def ViewAppliedStudent(request, pk):
 
-    if request.method == "GET":
+    if request.curr_user.get('type') == 'recruiter':
         try:
             job = Job.objects.get(pk=pk)
             applied = Apply.objects.get(job=job)
@@ -615,11 +792,15 @@ def ViewAppliedStudent(request, pk):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
 
+
+@custom_view_decorator
 @ api_view(['POST'])
 def ChangeStatusApply(request, pk):
 
-    if request.method == "POST":
+    if request.curr_user.get('type') == 'recruiter':
         status = request.data.get('status')
 
         try:
@@ -632,3 +813,6 @@ def ChangeStatusApply(request, pk):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
