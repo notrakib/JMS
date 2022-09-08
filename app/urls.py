@@ -7,50 +7,50 @@ urlpatterns = [
     path('admin_signup', views.AdminSignUp),
     path('student_signup', views.StudentSignUp),
     path('recruiter_signup', views.RecruiterSignUp),
-    path('create_company', views.CreateCompany),  # Recruiter
-    path('create_job', views.CreateJob),  # Recruiter
+    path('create_company', views.CreateCompany),
+    path('create_job', views.CreateJob),
 
     path('admin_login', views.AdminSignIn),
     path('student_login', views.StudentSignIn),
     path('recruiter_login', views.RecruiterSignIn),
 
-    # path('Logout', views.SignOut),
-    path('ForgotPassword', views.ForgotPassword),
-    path('change_password', views.ChangePassword),
+    path('ForgotPassword', views.ForgotPassword),  # E
+    path('change_password', views.ChangePassword),  # E
 
-    path('all_admins', views.ViewAdmins),  # Manager
-    path('all_users', views.ViewUsers),  # Manager
-    path('all_students', views.ViewStudents),  # Manager
-    path('all_recruiters', views.ViewRecruiters),  # Stuff
+    path('all_admins', views.ViewAdmins),
+    path('all_users', views.ViewUsers),
+    path('all_students', views.ViewStudents),
+    path('all_recruiters', views.ViewRecruiters),
     path('all_companies', views.ViewCompanies),
     path('all_jobs', views.ViewJobs),
 
-    path('edit_company/<int:pk>', views.EditCompany),  # Recruiter
-    path('edit_job/<int:pk>', views.EditJob),  # Recruiter
+    path('edit_company/<int:pk>', views.EditCompany),
+    path('edit_job/<int:pk>', views.EditJob),
 
-    path('delete_user/<int:pk>', views.DeleteUser),  # Manager
-    path('delete_recruiter/<int:pk>', views.DeleteRecruiter),  # Stuff
-    path('delete_company/<int:pk>', views.DeleteCompany),  # Stuff
-    path('delete_job/<int:pk>', views.DeleteJob),  # Recruiter
+    path('delete_user/<int:pk>', views.DeleteUser),
+    path('delete_recruiter/<int:pk>', views.DeleteRecruiter),
+    path('delete_company/<int:pk>', views.DeleteCompany),
+    path('delete_job/<int:pk>', views.DeleteJob),
 
-    path('recruiter_pending', views.RecruiterPending),  # Stuff
-    path('recruiter_accepted', views.RecruiterAccept),  # Stuff
-    path('recruiter_rejected', views.RecruiterReject),  # Stuff
+    path('recruiter_pending', views.RecruiterPending),
+    path('recruiter_accepted', views.RecruiterAccept),
+    path('recruiter_rejected', views.RecruiterReject),
 
     path('change_status/admin/<int:pk>',
-         views.ChangeStatusAdmin),  # Stuff
+         views.ChangeStatusAdmin),
     path('change_status/recruiter/<int:pk>',
-         views.ChangeStatusRecruiter),  # Stuff
-    path('change_status/job/<int:pk>', views.ChangeStatusJob),  # Recruiter
+         views.ChangeStatusRecruiter),
+    path('change_status/job/<int:pk>', views.ChangeStatusJob),
 
     path('available_jobs', views.AvailableJobs),
     path('job_detail/<int:pk>', views.JobDetail),
-    path('applyforjob/<int:pk>', views.ApplyForJob),  # Student
+    path('applyforjob/<int:pk>', views.ApplyForJob),
 
-    path('applied_jobs', views.StudentJobList),  # Student
+    path('applied_jobs', views.StudentJobList),
 
-    path('created_jobs', views.RecruiterJobList),  # Recruiter
-    path('applied_student/<int:pk>', views.ViewAppliedStudent),  # Recruiter
-    path('change_status/apply/<int:pk>', views.ChangeStatusApply),  # Recruiter
+    path('created_jobs', views.RecruiterJobList),
+    path('applied_student/<int:pk>', views.ViewAppliedStudent),
+    path('applied_student_details/<int:pk>', views.AppliedStudentDetails),
+    path('change_status/apply/<int:pk>', views.ChangeStatusApply),
 
 ]+static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

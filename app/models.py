@@ -65,7 +65,7 @@ class Job(models.Model):
     recruiter = models.ForeignKey(
         Recruiter, on_delete=models.CASCADE, related_name='job_recruiter')
     company = models.ForeignKey(
-        Recruiter, on_delete=models.CASCADE, related_name='job_company')
+        Company, on_delete=models.CASCADE, related_name='job_company')
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=500)
     experience = models.CharField(max_length=50)

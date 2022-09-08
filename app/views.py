@@ -1,4 +1,3 @@
-from sqlite3 import Date
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -8,6 +7,7 @@ from datetime import date
 import random
 from django.utils.decorators import decorator_from_middleware
 from app.middleware.middleware_session import session_middleware
+import bcrypt
 
 from functools import wraps
 import json
@@ -20,7 +20,7 @@ def custom_view_decorator(view_function):
     def wrap(request, *args, **kwargs):
         try:
             token = request.META.get('HTTP_AUTHORIZATION').split()
-            user = jwt.decode(token[1], key='my_super_secret',
+            user = jwt.decode(token[1], key='ami_rakib',
                               algorithms=['HS256', ])
 
             request.curr_user = user
@@ -38,17 +38,18 @@ def AdminSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    image = request.FILES.get('image')
+    # image = request.FILES.get('image')
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
 
-    type = request.data.get('type')
     try:
+        hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
+
         user = User.objects.create(
-            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         admin = Admin.objects.create(
-            user=user,  type=type)
+            user=user)
 
         serializer = AdminSerializer(admin)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -63,14 +64,16 @@ def StudentSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    image = request.FILES.get('image')
+    # image = request.FILES.get('image')
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
 
     # resume = request.FILES.get('resume')
     try:
+        hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
+
         user = User.objects.create(
-            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         student = Student.objects.create(
             user=user)
@@ -88,13 +91,15 @@ def RecruiterSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    image = request.FILES.get('image')
+    # image = request.FILES.get('image')
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
 
     try:
+        hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
+
         user = User.objects.create(
-            name=name, email=email, password=password, image=image, mobile=mobile, gender=gender)
+            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         recruiter = Recruiter.objects.create(
             user=user)
@@ -108,7 +113,7 @@ def RecruiterSignUp(request):
 
 @custom_view_decorator
 @api_view(['POST'])
-def CreateCompany(request, pk):
+def CreateCompany(request):
 
     if request.curr_user.get('type') == 'recruiter':
 
@@ -120,9 +125,8 @@ def CreateCompany(request, pk):
             description = request.data.get('description')
             type = request.data.get('type')
 
-            recruiter = request.objects.get(pk=pk)
             try:
-                company = Company.objects.create(recruiter=recruiter,
+                company = Company.objects.create(recruiter=Recruiter.objects.get(pk=request.curr_user.get('id')),
                                                  email=email, name=name,  description=description, type=type)
 
                 serializer = CompanySerializer(company)
@@ -149,12 +153,13 @@ def AdminSignIn(request):
 
         if admin:
 
-            if admin[0].user.password == password:
+            if bcrypt.checkpw(bytes(password, 'utf-8'), admin[0].user.password.encode('utf-8')):
 
                 payload_data = {
                     "id": admin[0].id,
                     "email": admin[0].user.email,
-                    "type": admin[0].type
+                    "type": admin[0].type,
+                    "status": admin[0].status
                 }
                 token = jwt.encode(
                     payload=payload_data,
@@ -183,7 +188,7 @@ def StudentSignIn(request):
 
         if student.exists():
 
-            if student[0].user.password == password:
+            if bcrypt.checkpw(bytes(password, 'utf-8'), student[0].user.password.encode('utf-8')):
 
                 payload_data = {
                     "id": student[0].id,
@@ -217,12 +222,13 @@ def RecruiterSignIn(request):
 
         if recruiter:
 
-            if recruiter[0].user.password == password:
+            if bcrypt.checkpw(bytes(password, 'utf-8'), recruiter[0].user.password.encode('utf-8')):
 
                 payload_data = {
                     "id": recruiter[0].id,
                     "email": recruiter[0].user.email,
-                    "type": recruiter[0].type
+                    "type": recruiter[0].type,
+                    "status": recruiter[0].status
                 }
                 token = jwt.encode(
                     payload=payload_data,
@@ -290,8 +296,8 @@ def ViewStudents(request):
 
         try:
             if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
-                students = User.objects.select_related('student').all()
-                serializer = UserStudentSerializer(students, many=True)
+                students = Student.objects.select_related('user').all()
+                serializer = StudentSerializer(students, many=True)
                 return Response(serializer.data,  status=status.HTTP_200_OK)
 
             else:
@@ -310,8 +316,8 @@ def ViewRecruiters(request):
 
     if request.curr_user.get('type') == 'admin':
         try:
-            students = User.objects.select_related('recruiter').all()
-            serializer = UserRecruiterSerializer(students, many=True)
+            students = Recruiter.objects.select_related('user').all()
+            serializer = RecruiterSerializer(students, many=True)
             return Response(serializer.data,  status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -475,14 +481,14 @@ def ChangeStatusAdmin(request, pk):
     if request.curr_user.get('type') == 'admin':
 
         try:
-            status = request.data.get('status')
+            statuss = request.data.get('status')
 
             if Admin.objects.get(pk=request.curr_user.get('id')).status == 'manager':
                 admin = Admin.objects.get(pk=pk)
-                admin.status = status
-                res = admin.save()
+                admin.status = statuss
+                admin.save()
 
-                serializer = AdminSerializer(res)
+                serializer = AdminSerializer(admin)
                 return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
             else:
@@ -500,13 +506,13 @@ def ChangeStatusAdmin(request, pk):
 def ChangeStatusRecruiter(request, pk):
 
     if request.curr_user.get('type') == 'admin':
-        status = request.data.get('status')
+        statuss = request.data.get('status')
         try:
             recruiter = Recruiter.objects.get(pk=pk)
-            recruiter.status = status
-            res = recruiter.save()
+            recruiter.status = statuss
+            recruiter.save()
 
-            serializer = RecruiterSerializer(res)
+            serializer = RecruiterSerializer(recruiter)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
         except Exception as e:
@@ -522,10 +528,11 @@ def ChangeStatusJob(request, pk):
 
     if request.curr_user.get('type') == 'recruiter':
 
-        status = request.data.get('status')
+        statuss = request.data.get('status')
         try:
-            job = Job.objects.get(pk=pk).update(
-                end_date=date.today(), status=status)
+            job = Job.objects.get(pk=pk)
+            job.status = statuss
+
             serializer = JobSerializer(job)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -561,8 +568,8 @@ def ChangePassword(request, link):
         try:
             user = User.objects.get(email=email)
             user.password = password
-            res = user.save()
-            serializer = UserSerializer(res)
+            user.save()
+            serializer = UserSerializer(user)
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
         except Exception as e:
@@ -575,10 +582,11 @@ def CreateJob(request):
 
     if request.curr_user.get('type') == 'recruiter':
 
-        if Recruiter.objects.get(pk=request.curr_user.get('id')).status == 'accepted':
+        recruiter = Recruiter.objects.get(pk=request.curr_user.get('id'))
+        company = Company.objects.get(recruiter=recruiter)
 
-            recruiter = request.data.get('recruiter')
-            company = request.data.get('company')
+        if recruiter.status == 'accepted':
+
             title = request.data.get('title')
             description = request.data.get('description')
             experience = request.data.get('experience')
@@ -586,11 +594,13 @@ def CreateJob(request):
             location = request.data.get('location')
             salary = request.data.get('salary')
             end_date = request.data.get('end_date')
-            status = request.data.get('status')
+            yy = int(end_date[0])
+            mm = int(end_date[1])
+            dd = int(end_date[2])
 
             try:
                 job = Job.objects.create(recruiter=recruiter, company=company, title=title, description=description, experience=experience, skills=skills,
-                                         location=location,  salary=salary,  start_date=date.today(), end_date=end_date, status=status)
+                                         location=location,  salary=salary,  start_date=date.today(), end_date=date(yy, mm, dd))
                 serializer = JobSerializer(job)
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -631,10 +641,14 @@ def EditCompany(request, pk):
             type = request.data.get('type')
 
             try:
-                company = Company.objects.get(pk=pk).update(
-                    email=email, name=name,  description=description, type=type)
+                company = Company.objects.get(pk=pk)
+                company.email = email
+                company.name = name
+                company.description = description
+                company.type = type
+                company.save()
 
-                serializer = CompanySerializer(company)
+                serializer = OnlyCompanySerializer(company)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
             except Exception as e:
@@ -662,11 +676,22 @@ def EditJob(request, pk):
             location = request.data.get('location')
             salary = request.data.get('salary')
             end_date = request.data.get('end_date')
-            status = request.data.get('status')
+
+            yy = int(end_date[0])
+            mm = int(end_date[1])
+            dd = int(end_date[2])
 
             try:
-                job = Job.objects.get(pk=pk).update(title=title, description=description, experience=experience, skills=skills,
-                                                    location=location,  salary=salary, end_date=end_date, status=status)
+                job = Job.objects.get(pk=pk)
+                job.title = title
+                job.description = description
+                job.experience = experience
+                job.skills = skills
+                job.location = location
+                job.salary = salary
+                job.end_date = date(yy, mm, dd)
+                job.save()
+
                 serializer = JobSerializer(job)
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -689,7 +714,7 @@ def AvailableJobs(request):
             job = Job.objects.exclude(
                 apply__student=Student.objects.get(pk=request.curr_user.get('id')))
 
-            serializer = OnlyJobSerializer(job, many=True)
+            serializer = CompanyJobSerializer(job, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -706,9 +731,8 @@ def StudentJobList(request):
     if request.curr_user.get('type') == 'student':
         try:
             student = Student.objects.get(pk=request.curr_user.get('id'))
-            job = Job.objects.select_related(
-                'apply').filter(apply__student=student)
-            serializer = JobSerializer(job, many=True)
+            job = Job.objects.filter(apply__student=student)
+            serializer = CompanyJobSerializer(job, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -746,7 +770,7 @@ def JobDetail(request, pk):
 
     try:
         job = Job.objects.get(pk=pk)
-        serializer = JobSerializer(job)
+        serializer = CompanyJobSerializer(job)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -760,15 +784,20 @@ def ApplyForJob(request, pk):
     if request.curr_user.get('type') == 'student':
         try:
             job = Job.objects.get(pk=pk)
-            student = Student.objects.get(pk=1)
-            today = date.today()
-            if job.end_date < today:
-                raise Exception('Sorry, submission date over')
+
+            if job.status == 'open':
+                student = Student.objects.get(pk=1)
+                today = date.today()
+                if job.end_date < today:
+                    raise Exception('Sorry, submission date is over')
+                else:
+                    apply = Apply.objects.create(
+                        job=job, student=student, applydate=date.today())
+                    serializer = ApplySerializer(apply)
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
             else:
-                apply = Apply.objects.create(
-                    job=job, student=student, applydate=date.today())
-                serializer = ApplySerializer(apply)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response({'error': 'Sorry, job is closed for applying'}, status=status.HTTP_403_FORBIDDEN)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -784,9 +813,47 @@ def ViewAppliedStudent(request, pk):
     if request.curr_user.get('type') == 'recruiter':
         try:
             job = Job.objects.get(pk=pk)
-            applied = Apply.objects.get(job=job)
+            applied = Apply.objects.filter(job=job)
 
-            serializer = ApplySerializer(applied, many=True)
+            serializer = ApplyJobSerializer(applied, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
+
+
+@custom_view_decorator
+@ api_view(['GET'])
+def AppliedStudentDetails(request, pk):
+
+    if request.curr_user.get('type') == 'recruiter':
+        try:
+            job = Job.objects.get(pk=pk)
+            applied = Apply.objects.filter(job=job)
+
+            serializer = ApplyJobSerializer(applied, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    else:
+        return Response({'error': 'Requested User is UNAUTHORIZED'}, status=status.HTTP_403_FORBIDDEN)
+
+
+@custom_view_decorator
+@ api_view(['GET'])
+def AppliedStudentDetails(request, pk):
+
+    if request.curr_user.get('type') == 'recruiter':
+
+        try:
+            applied = Apply.objects.get(pk=pk)
+
+            serializer = ApplySerializer(applied)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -801,14 +868,15 @@ def ViewAppliedStudent(request, pk):
 def ChangeStatusApply(request, pk):
 
     if request.curr_user.get('type') == 'recruiter':
-        status = request.data.get('status')
+        statuss = request.data.get('status')
 
         try:
             applied = Apply.objects.get(pk=pk)
-            applied.status = status
-            res = applied.save()
 
-            serializer = ApplySerializer(res, many=True)
+            applied.status = statuss
+            applied.save()
+
+            serializer = ApplyJobSerializer(applied)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:

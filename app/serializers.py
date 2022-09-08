@@ -5,7 +5,7 @@ from .models import *
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password',
+        fields = ['id', 'name', 'email',
                   'mobile', 'gender']
 
 
@@ -28,7 +28,7 @@ class UserStudentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password',
+        fields = ['id', 'name', 'email',
                   'mobile', 'gender', 'student']
 
 
@@ -43,7 +43,7 @@ class UserRecruiterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email', 'password',
+        fields = ['id', 'name', 'email',
                   'mobile', 'gender', 'recruiter']
 
 
@@ -69,7 +69,7 @@ class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
         fields = ['id', 'recruiter', 'email', 'name',
-                  'logo', 'description', 'type', 'status']
+                  'description', 'type', 'status']
 
 
 class OnlyCompanySerializer(serializers.ModelSerializer):
@@ -81,7 +81,7 @@ class OnlyCompanySerializer(serializers.ModelSerializer):
 
 class JobSerializer(serializers.ModelSerializer):
     recruiter = RecruiterSerializer(read_only=True)
-    company = CompanySerializer(read_only=True)
+    company = OnlyCompanySerializer(read_only=True)
 
     class Meta:
         model = Job
@@ -96,8 +96,17 @@ class OnlyJobSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CompanyJobSerializer(serializers.ModelSerializer):
+    company = OnlyCompanySerializer(read_only=True)
+
+    class Meta:
+        model = Job
+        fields = ['id',  'company', 'title',
+                  'description', 'experience', 'skills', 'location', 'salary', 'start_date', 'end_date', 'status']
+
+
 class ApplySerializer(serializers.ModelSerializer):
-    job = JobSerializer(read_only=True)
+    job = OnlyJobSerializer(read_only=True)
     student = StudentSerializer(read_only=True)
 
     class Meta:
@@ -105,11 +114,17 @@ class ApplySerializer(serializers.ModelSerializer):
         fields = ['id', 'job', 'student', 'applydate', 'status']
 
 
-class StringSerializer(serializers.Serializer):
-    error = serializers.CharField(max_length=256)
+class ApplyJobSerializer(serializers.ModelSerializer):
+    job = OnlyJobSerializer(read_only=True)
+
+    class Meta:
+        model = Apply
+        fields = ['id', 'job', 'applydate', 'status']
 
 
-# class ForgotPasswordUser(serializers.ModelSerializer):
-#     user = UserSerializer(read_only=True)
+class ApplyStudentSerializer(serializers.ModelSerializer):
+    student = StudentSerializer(read_only=True)
 
-#     fields = ['user',]
+    class Meta:
+        model = Apply
+        fields = ['id', 'student', 'applydate', 'status']
