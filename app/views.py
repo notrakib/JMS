@@ -4,7 +4,7 @@ from rest_framework import status
 from .serializers import *
 from .models import *
 from datetime import date
-import random
+from random import random
 from django.utils.decorators import decorator_from_middleware
 from app.middleware.middleware_session import session_middleware
 import bcrypt
@@ -38,7 +38,7 @@ def AdminSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    # image = request.FILES.get('image')
+    image = request.FILES('image')
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
 
@@ -46,7 +46,7 @@ def AdminSignUp(request):
         hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
 
         user = User.objects.create(
-            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
+            name=name, email=email, image=image, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         admin = Admin.objects.create(
             user=user)
@@ -64,19 +64,19 @@ def StudentSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    # image = request.FILES.get('image')
+    image = request.FILES['image']
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
+    resume = request.FILES['resume']
 
-    # resume = request.FILES.get('resume')
     try:
         hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
 
         user = User.objects.create(
-            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
+            name=name, email=email, image=image, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         student = Student.objects.create(
-            user=user)
+            user=user, resume=resume)
 
         serializer = StudentSerializer(student)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -91,7 +91,7 @@ def RecruiterSignUp(request):
     name = request.data.get('name')
     email = request.data.get('email')
     password = request.data.get('password')
-    # image = request.FILES.get('image')
+    image = request.FILES('image')
     mobile = request.data.get('mobile')
     gender = request.data.get('gender')
 
@@ -99,7 +99,7 @@ def RecruiterSignUp(request):
         hashed = bcrypt.hashpw(bytes(password, 'utf-8'), bcrypt.gensalt())
 
         user = User.objects.create(
-            name=name, email=email, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
+            name=name, email=email, image=image, password=hashed.decode('utf-8'),  mobile=mobile, gender=gender)
 
         recruiter = Recruiter.objects.create(
             user=user)
@@ -121,13 +121,13 @@ def CreateCompany(request):
 
             email = request.data.get('email')
             name = request.data.get('name')
-            # logo = request.FILES.get('logo')
+            logo = request.FILES('logo')
             description = request.data.get('description')
             type = request.data.get('type')
 
             try:
                 company = Company.objects.create(recruiter=Recruiter.objects.get(pk=request.curr_user.get('id')),
-                                                 email=email, name=name,  description=description, type=type)
+                                                 email=email, name=name, logo=logo, description=description, type=type)
 
                 serializer = CompanySerializer(company)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -549,11 +549,35 @@ def ForgotPassword(request):
     email = request.data.get('email')
 
     try:
-        user = User.objects.get(email=email)
-        link = random.randint(0, 100000)
-        serializer = UserSerializer(user)
+        user = User.objects.filter(email=email)
 
-        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        if user.exists():
+
+            forgot_password_link = ForgotPasswordLink.objects.filter(
+                user=user[0])
+
+            if forgot_password_link.exists():
+
+                link = random().hex()+'_'+str(user[0].id)
+                new_link = forgot_password_link[0]
+                new_link.link = link
+                new_link.save()
+
+                serializer = LinkSerializer(new_link)
+                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+            else:
+
+                link = random().hex()+'_'+str(user[0].id)
+
+                linkobj = ForgotPasswordLink.objects.create(
+                    user=user[0], link=link)
+
+                serializer = LinkSerializer(linkobj)
+                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        else:
+            raise Exception('Email doesnot exist')
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -562,18 +586,32 @@ def ForgotPassword(request):
 @api_view(['POST'])
 def ChangePassword(request, link):
 
-    email = request.data.get('email')
     password = request.data.get('password')
-    if request.method == "POST" and link == 'oo':
-        try:
-            user = User.objects.get(email=email)
-            user.password = password
-            user.save()
-            serializer = UserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        url_link = ForgotPasswordLink.objects.filter(link=link)
+
+        if url_link.exists():
+            if url_link[0].expDate > datetime.date.today():
+                user = User.objects.get(id=link.split('_')[1])
+                hashed = bcrypt.hashpw(
+                    bytes(password, 'utf-8'), bcrypt.gensalt())
+
+                user.password = hashed.decode('utf-8')
+                user.save()
+                url_link.delete()
+
+                serializer = UserSerializer(user)
+                return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+            else:
+                raise Exception("Link expired")
+
+        else:
+            raise Exception("Link invalid")
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @custom_view_decorator
@@ -636,7 +674,7 @@ def EditCompany(request, pk):
 
             email = request.data.get('email')
             name = request.data.get('name')
-            # logo = request.FILES.get('logo')
+            logo = request.FILES('logo')
             description = request.data.get('description')
             type = request.data.get('type')
 
@@ -644,6 +682,7 @@ def EditCompany(request, pk):
                 company = Company.objects.get(pk=pk)
                 company.email = email
                 company.name = name
+                company.logo = logo
                 company.description = description
                 company.type = type
                 company.save()

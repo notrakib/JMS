@@ -5,8 +5,7 @@ from .models import *
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'name', 'email',
-                  'mobile', 'gender']
+        fields = '__all__'
 
 
 class StudentSerializer(serializers.ModelSerializer):
@@ -14,13 +13,13 @@ class StudentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Student
-        fields = ['id', 'user', 'type']
+        fields = ['id', 'user', 'resume', 'type']
 
 
 class OnlyStudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = ['id', 'type']
+        fields = ['id', 'resume', 'type']
 
 
 class UserStudentSerializer(serializers.ModelSerializer):
@@ -28,7 +27,7 @@ class UserStudentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email',
+        fields = ['id', 'name', 'email', 'image',
                   'mobile', 'gender', 'student']
 
 
@@ -43,7 +42,7 @@ class UserRecruiterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'email',
+        fields = ['id', 'name', 'email', 'image',
                   'mobile', 'gender', 'recruiter']
 
 
@@ -68,7 +67,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Company
-        fields = ['id', 'recruiter', 'email', 'name',
+        fields = ['id', 'recruiter', 'email', 'name', 'logo',
                   'description', 'type', 'status']
 
 
@@ -128,3 +127,11 @@ class ApplyStudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Apply
         fields = ['id', 'student', 'applydate', 'status']
+
+
+class LinkSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = ForgotPasswordLink
+        fields = ['id', 'user', 'link', 'expDate']

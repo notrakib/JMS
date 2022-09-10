@@ -1,3 +1,5 @@
+from datetime import timedelta
+import datetime
 from django.db import models
 
 
@@ -5,7 +7,7 @@ class User(models.Model):
     name = models.CharField(max_length=20)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=50)
-    # image = models.FileField(null=True)
+    image = models.FileField(null=True, upload_to='images/')
     mobile = models.IntegerField()
     gender = models.CharField(max_length=10,
                               choices=[('male', 'Male'), ('female', 'Female')])
@@ -28,7 +30,7 @@ class Admin(models.Model):
 class Student(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='student')
-    # resume = models.FileField(null=True)
+    resume = models.FileField(null=True, upload_to='documents/')
     type = models.CharField(max_length=10, default='student')
 
     def _str_(self):
@@ -51,7 +53,7 @@ class Company(models.Model):
         Recruiter, on_delete=models.CASCADE, related_name='company_recruiter')
     email = models.EmailField(max_length=20, unique=True)
     name = models.CharField(max_length=70)
-    # logo = models.FileField(null=True, default='media/logo.webp')
+    logo = models.FileField(null=True, default='media/logo.webp')
     description = models.CharField(max_length=500)
     type = models.CharField(max_length=20, default='business')
     status = models.CharField(max_length=10, default='running', choices=[
@@ -94,3 +96,10 @@ class Apply(models.Model):
 
     def _str_(self):
         return self.job.title, self.student.user.name, self.status
+
+
+class ForgotPasswordLink(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    link = models.CharField(max_length=40)
+    expDate = models.DateField(
+        default=datetime.date.today() + timedelta(days=1))

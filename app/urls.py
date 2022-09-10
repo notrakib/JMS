@@ -14,8 +14,8 @@ urlpatterns = [
     path('student_login', views.StudentSignIn),
     path('recruiter_login', views.RecruiterSignIn),
 
-    path('ForgotPassword', views.ForgotPassword),  # E
-    path('change_password', views.ChangePassword),  # E
+    path('forgotPassword', views.ForgotPassword),
+    path('change_password/<str:link>', views.ChangePassword),
 
     path('all_admins', views.ViewAdmins),
     path('all_users', views.ViewUsers),
