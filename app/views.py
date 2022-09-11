@@ -5,19 +5,10 @@ from .serializers import *
 from .models import *
 from datetime import date, datetime
 from random import random
-from django.utils.decorators import decorator_from_middleware
-from app.middleware.middleware_session import session_middleware
 import bcrypt
 
 from functools import wraps
-import json
-from django.http import HttpResponseForbidden
 import jwt
-
-
-@api_view()
-def error_page(request):
-    return Response({'error': 'Invalid URL'}, status=status.HTTP_404_NOT_FOUND)
 
 
 def custom_view_decorator(view_function):
