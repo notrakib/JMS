@@ -134,4 +134,4 @@ class LinkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ForgotPasswordLink
-        fields = ['id', 'user', 'link', 'expDate']
+        fields = ['id', 'user', 'link']

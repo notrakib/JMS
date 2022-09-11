@@ -1,5 +1,4 @@
-from datetime import timedelta
-import datetime
+from django.utils import timezone
 from django.db import models
 
 
@@ -98,8 +97,12 @@ class Apply(models.Model):
         return self.job.title, self.student.user.name, self.status
 
 
+def expDate_func():
+    return timezone.now() + timezone.timedelta(days=1)
+
+
 class ForgotPasswordLink(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     link = models.CharField(max_length=40)
     expDate = models.DateField(
-        default=datetime.date.today() + timedelta(days=1))
+        default=expDate_func)

@@ -5,3 +5,5 @@ Untitled-1.ipynb
 __pycache__
 
 middleware/__pycache__
+app/__pycache__
+jms/__pycache__

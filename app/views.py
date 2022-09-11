@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import *
 from .models import *
-from datetime import date
+from datetime import date, datetime
 from random import random
 from django.utils.decorators import decorator_from_middleware
 from app.middleware.middleware_session import session_middleware
@@ -13,6 +13,11 @@ from functools import wraps
 import json
 from django.http import HttpResponseForbidden
 import jwt
+
+
+@api_view()
+def error_page(request):
+    return Response({'error': 'Invalid URL'}, status=status.HTTP_404_NOT_FOUND)
 
 
 def custom_view_decorator(view_function):
@@ -592,7 +597,8 @@ def ChangePassword(request, link):
         url_link = ForgotPasswordLink.objects.filter(link=link)
 
         if url_link.exists():
-            if url_link[0].expDate > datetime.date.today():
+
+            if url_link[0].expDate > datetime.date(timezone.now()):
                 user = User.objects.get(id=link.split('_')[1])
                 hashed = bcrypt.hashpw(
                     bytes(password, 'utf-8'), bcrypt.gensalt())
